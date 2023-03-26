@@ -8,6 +8,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/pelletier/go-toml"
 )
@@ -67,14 +68,12 @@ func GetConfig() (*Config, error) {
 		return nil, fmt.Errorf("error load profile: %w", err)
 	}
 
-	err = createIfNotExistChatLogDir(setting.Setting.ChatLogDir)
+	chatLogDir, err := createIfNotExistChatLogDir(setting.Setting.ChatLogDir)
 	if err != nil {
 		return nil, fmt.Errorf("error create chat log dir: %w", err)
 	}
 
-	if setting.Setting.ChatLogDir == "" {
-		setting.Setting.ChatLogDir = chatLogDirDefaultPath
-	}
+	setting.Setting.ChatLogDir = chatLogDir
 
 	return &Config{
 		Setting:  setting.Setting,
@@ -175,16 +174,25 @@ default = true
 	return profile, nil
 }
 
-func createIfNotExistChatLogDir(chatLogDir string) error {
+func createIfNotExistChatLogDir(chatLogDir string) (string, error) {
 	if chatLogDir == "" {
 		chatLogDir = chatLogDirDefaultPath
+	} else {
+		if strings.HasPrefix(chatLogDir, "~") {
+			usr, err := user.Current()
+			if err != nil {
+				return "", err
+			}
+			homeDir := usr.HomeDir
+			chatLogDir = strings.Replace(chatLogDir, "~", homeDir, 1)
+		}
 	}
 
 	if err := createDirIfNotExist(chatLogDir); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return chatLogDir, nil
 }
 
 func CmdConfig(editor string, setting bool, profile bool) error {
