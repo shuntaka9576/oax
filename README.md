@@ -1,6 +1,13 @@
 # oax(OpenAI eXecutor)
 
-CLI for OpenAI's ChatGPT.
+💥 CLI for OpenAI's ChatGPT.
+
+*For basic use cases.*
+![gif](https://res.cloudinary.com/dkerzyk09/image/upload/v1679860503/tools/oax/oax-chat.gif)
+
+
+*Resuming chat sessions from a previous point.*
+![gif](https://res.cloudinary.com/dkerzyk09/image/upload/v1679860850/tools/oax/chat-resume.gif)
 
 ## Installation
 
