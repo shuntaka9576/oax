@@ -1,0 +1,46 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    main: ./cmd/oax/main.go
+    binary: oax
+    ldflags:
+      - -s -w -X github.com/shuntaka9576/oax/cli.Version={{ .Version }} -X github.com/shuntaka9576/oax/cli.Revision={{ .ShortCommit }}
+    goos:
+      - linux
+      - darwin
+    ignore:
+      - goarch: 386
+      - goarch: arm64
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements:
+      darwin: Darwin
+      linux: Linux
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+brews:
+  -
+    tap:
+      owner: shuntaka9576
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    url_template: "https://github.com/shuntaka9576/oax/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    homepage: "https://blog.hozi.dev/"
+    folder: Formula
+    description: "CLI for OpenAI's ChatGPT"
+    test: |
+      system "#{bin}/oax --help"
+    install: |
+      bin.install "oax"
