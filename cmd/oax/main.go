@@ -17,8 +17,8 @@ type Globals struct {
 var CLI struct {
 	Globals
 	Config struct {
-		Settings bool `help:"Open the setting configuration file."`
-		Profiles bool `help:"Open the profile configuration file."`
+		Settings bool `help:"Open the settings configuration file."`
+		Profiles bool `help:"Open the profiles configuration file."`
 	} `cmd:"" help:"Provides a feature to check the OAX configuration settings"`
 	Chat struct {
 		Model        string  `short:"m" help:"Specify the ID of the model to use gpt-4, gpt-4-0314, gpt-4-32k, gpt-4-32k-0314, gpt-3.5-turbo, gpt-3.5-turbo-0301(default gpt-3.5-turbo)"`
