@@ -103,10 +103,28 @@ e.g.
 |Option|Description|Required|Default|
 |---|---|---|---|
 |model|ChatGPT model|false|`gpt-3.5-turbo`|
+|chat.templates|Chat template|false||
 
 ```toml
 [chat]
   model = "gpt-3.5-turbo"
+
+  [[chat.templates]]
+    name = "friends"
+
+    [[chat.templates.messages]]
+      role = "system"
+      content = "You are ChatGPT, a large language model trained by OpenAI. You are a friendly assistant that can provide help, advice, and engage in casual conversations."
+```
+
+Specify a model.
+```bash
+oax chat -m "gpt-4"
+```
+
+Specify a chat template
+```bash
+oax chat -t "friends"
 ```
 
 ### Profiles

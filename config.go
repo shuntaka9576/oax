@@ -23,7 +23,18 @@ type Setting struct {
 }
 
 type Chat struct {
-	Model string `toml:"model"`
+	Model     string         `toml:"model"`
+	Templates []ChatTemplate `toml:"templates"`
+}
+
+type ChatTemplate struct {
+	Name     string    `toml:"name"`
+	Messages []Message `toml:"messages"`
+}
+
+type Message struct {
+	Role    string `toml:"role"`
+	Content string `toml:"content"`
 }
 
 type Profile struct {

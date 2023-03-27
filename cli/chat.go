@@ -23,6 +23,7 @@ type ChatOption struct {
 	Role           string
 	ChatLogDir     string
 	File           *string
+	Template       *oax.ChatTemplate
 }
 
 var (
@@ -51,6 +52,14 @@ func ChatNew(opt *ChatOption) error {
 		ConfigDir:   opt.ChatLogDir,
 		ChatLogToml: oax.ChatLogToml{},
 	}
+	if opt.Template != nil {
+		for _, message := range opt.Template.Messages {
+			chatLog.AddChatMessage(
+				oax.ChatMessage(message),
+			)
+		}
+	}
+
 	chatLog.AddChatMessage(userEmptyMessage)
 
 	err := chatLog.FlushFile()

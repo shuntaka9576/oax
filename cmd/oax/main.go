@@ -21,8 +21,9 @@ var CLI struct {
 		Profiles bool `help:"Open the profile configuration file."`
 	} `cmd:"" help:"Provides a feature to check the OAX configuration settings"`
 	Chat struct {
-		Model string  `short:"m" help:"Specify the ID of the model to use gpt-4, gpt-4-0314, gpt-4-32k, gpt-4-32k-0314, gpt-3.5-turbo, gpt-3.5-turbo-0301(default gpt-3.5-turbo)"`
-		File  *string `short:"f" help:"Specify the chat history file with the full path."`
+		Model        string  `short:"m" help:"Specify the ID of the model to use gpt-4, gpt-4-0314, gpt-4-32k, gpt-4-32k-0314, gpt-3.5-turbo, gpt-3.5-turbo-0301(default gpt-3.5-turbo)"`
+		File         *string `short:"f" help:"Specify the chat history file with the full path."`
+		TemplateName string  `short:"t" help:"Specify a chat template name."`
 	} `cmd:"" help:"Provides a dialogue function like chat.openai.com."`
 }
 
@@ -58,6 +59,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	var useTemplate *oax.ChatTemplate
+	if CLI.Chat.TemplateName != "" {
+		for _, template := range config.Settings.Chat.Templates {
+			if CLI.Chat.TemplateName == template.Name {
+				useTemplate = &template
+			}
+		}
+	}
+
 	switch kontext.Command() {
 	case "config":
 		err := cli.Config(config.Settings.Setting.Editor, CLI.Config.Settings, CLI.Config.Profiles)
@@ -85,6 +95,7 @@ func main() {
 			Model:          model,
 			ChatLogDir:     config.Settings.Setting.ChatLogDir,
 			File:           CLI.Chat.File,
+			Template:       useTemplate,
 		})
 		if err != nil {
 			os.Exit(1)
