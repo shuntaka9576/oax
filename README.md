@@ -134,6 +134,7 @@ oax chat -t "friends"
 |name|Profile name|true|`vim`|
 |apiKey|OpenAI API key|true|`~/.config/oax/chat-log`|
 |default|Set the default profile configuration (API key) to be used.|false. Please ensure that the "default" option is set for at least one Profile.|`true`|
+|organizationId|OpenAI Organization ID|false|
 
 
 e.g.
