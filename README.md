@@ -3,11 +3,10 @@
 💥 CLI for OpenAI's ChatGPT.
 
 *For basic use cases.*
-![gif](https://res.cloudinary.com/dkerzyk09/image/upload/v1679860503/tools/oax/oax-chat.gif)
-
+![gif](https://res.cloudinary.com/dkerzyk09/image/upload/v1679945948/tools/oax/oax-chat_0.0.3.gif)
 
 *Resuming chat sessions from a previous point.*
-![gif](https://res.cloudinary.com/dkerzyk09/image/upload/v1679860850/tools/oax/chat-resume.gif)
+![gif](https://res.cloudinary.com/dkerzyk09/image/upload/v1679946265/tools/oax/oax-chat-resume_0.0.3.gif)
 
 ## Installation
 
