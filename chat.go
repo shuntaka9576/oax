@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -36,17 +35,13 @@ func (c *ChatLog) AddChatMessage(chatMessage ChatMessage) *ChatLog {
 }
 
 func (c *ChatLog) FilePathForUser() (string, error) {
-	usr, err := user.Current()
+	valuePath := *c.FilePath
+	replaced, err := replaceHomedirWithTilde(valuePath)
 	if err != nil {
 		return "", err
 	}
-	homeDir := usr.HomeDir
 
-	if strings.HasPrefix(*c.FilePath, homeDir) {
-		return strings.Replace(*c.FilePath, homeDir, "~", 1), nil
-	}
-
-	return *c.FilePath, nil
+	return replaced, nil
 }
 
 func (c *ChatLog) DeleteFile() error {
@@ -118,17 +113,11 @@ func (c *ChatLog) FlushFile() error {
 }
 
 func (c *ChatLog) LoadFile(filePath string) error {
-
-	if strings.HasPrefix(filePath, "~") {
-		usr, err := user.Current()
-		if err != nil {
-			return err
-		}
-		homeDir := usr.HomeDir
-
-		path := strings.Replace(*c.FilePath, "~", homeDir, 1)
-		c.FilePath = &path
+	filePath, err := replaceTildeWithHomedir(filePath)
+	if err != nil {
+		return err
 	}
+
 	c.FilePath = &filePath
 
 	return nil

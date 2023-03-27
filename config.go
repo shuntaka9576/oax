@@ -8,7 +8,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/pelletier/go-toml"
 )
@@ -182,13 +181,9 @@ func createIfNotExistChatLogDir(chatLogDir string) (string, error) {
 	if chatLogDir == "" {
 		chatLogDir = chatLogDirDefaultPath
 	} else {
-		if strings.HasPrefix(chatLogDir, "~") {
-			usr, err := user.Current()
-			if err != nil {
-				return "", err
-			}
-			homeDir := usr.HomeDir
-			chatLogDir = strings.Replace(chatLogDir, "~", homeDir, 1)
+		chatLogDir, err := replaceTildeWithHomedir(chatLogDir)
+		if err != nil {
+			return chatLogDir, err
 		}
 	}
 
