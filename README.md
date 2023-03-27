@@ -17,7 +17,7 @@ brew install shuntaka9576/tap/oax
 
 ## Requirements
 
-* Vim/Neovim
+Command-line text editor tools (Vim/Neovim/Nano, etc.).
 
 ## Quick Start
 
@@ -82,7 +82,7 @@ oax chat -m "gpt-3.5-turbo" -f "~/.config/oax/chat-log/2023-03-26_15-11-04.toml"
 |`~/.config/oax/settings.toml`|Specify command assist information for oax.|`oax config --settings`
 |`~/.config/oax/profiles.toml`|Specify information required for API connection.|`oax config --profiles`
 
-### Setting
+### Settings
 
 #### setting
 
