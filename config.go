@@ -13,14 +13,18 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-type SettingTOML struct {
+type Settings struct {
 	Setting Setting `toml:"setting"`
+	Chat    Chat    `toml:"chat"`
 }
 
 type Setting struct {
-	Editor               string `toml:"editor"`
-	ChatLogDir           string `toml:"chatLogDir"`
-	InferChatLogFileName string `toml:"inferChatLogFileName"`
+	Editor     string `toml:"editor"`
+	ChatLogDir string `toml:"chatLogDir"`
+}
+
+type Chat struct {
+	Model string `toml:"model"`
 }
 
 type Profile struct {
@@ -37,7 +41,7 @@ type ProfileToml struct {
 
 type Config struct {
 	Profiles []Profile
-	Setting  Setting
+	Settings Settings
 }
 
 var (
@@ -76,7 +80,7 @@ func GetConfig() (*Config, error) {
 	setting.Setting.ChatLogDir = chatLogDir
 
 	return &Config{
-		Setting:  setting.Setting,
+		Settings: *setting,
 		Profiles: profiles.Profiles,
 	}, nil
 }
@@ -103,7 +107,7 @@ func getConfigDir() (string, error) {
 	return configDir, nil
 }
 
-func loadSetting() (*SettingTOML, error) {
+func loadSetting() (*Settings, error) {
 	_, err := os.Stat(settingFilePath)
 
 	var configTree *toml.Tree
@@ -128,7 +132,7 @@ func loadSetting() (*SettingTOML, error) {
 		}
 	}
 
-	setting := &SettingTOML{}
+	setting := &Settings{}
 	err = configTree.Unmarshal(setting)
 	if err != nil {
 		return nil, err

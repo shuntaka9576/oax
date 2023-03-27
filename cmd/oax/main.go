@@ -21,7 +21,7 @@ var CLI struct {
 		Profiles bool `help:"Open the profile configuration file."`
 	} `cmd:"" help:"Provides a feature to check the OAX configuration settings"`
 	Chat struct {
-		Model string  `short:"m" default:"gpt-3.5-turbo" help:"Specify the ID of the model to use(gpt-4, gpt-4-0314, gpt-4-32k, gpt-4-32k-0314, gpt-3.5-turbo, gpt-3.5-turbo-0301)."`
+		Model string  `short:"m" help:"Specify the ID of the model to use gpt-4, gpt-4-0314, gpt-4-32k, gpt-4-32k-0314, gpt-3.5-turbo, gpt-3.5-turbo-0301(default gpt-3.5-turbo)"`
 		File  *string `short:"f" help:"Specify the chat history file with the full path."`
 	} `cmd:"" help:"Provides a dialogue function like chat.openai.com."`
 }
@@ -60,17 +60,30 @@ func main() {
 
 	switch kontext.Command() {
 	case "config":
-		err := cli.Config(config.Setting.Editor, CLI.Config.Settings, CLI.Config.Profiles)
+		err := cli.Config(config.Settings.Setting.Editor, CLI.Config.Settings, CLI.Config.Profiles)
 		if err != nil {
 			os.Exit(1)
 		}
 	case "chat":
+		var model string
+		defaultModel := "gpt-3.5-turbo"
+
+		if CLI.Chat.Model == "" && config.Settings.Chat.Model == "" {
+			model = defaultModel
+		} else if CLI.Chat.Model != "" && config.Settings.Chat.Model == "" {
+			model = CLI.Chat.Model
+		} else if CLI.Chat.Model == "" && config.Settings.Chat.Model != "" {
+			model = config.Settings.Chat.Model
+		} else if CLI.Chat.Model != "" && config.Settings.Chat.Model != "" {
+			model = CLI.Chat.Model
+		}
+
 		err := cli.Chat(&cli.ChatOption{
 			APIKey:         useProfile.ApiKey,
 			OrganizationID: useProfile.OrganizationID,
-			Editor:         config.Setting.Editor,
-			Model:          CLI.Chat.Model,
-			ChatLogDir:     config.Setting.ChatLogDir,
+			Editor:         config.Settings.Setting.Editor,
+			Model:          model,
+			ChatLogDir:     config.Settings.Setting.ChatLogDir,
 			File:           CLI.Chat.File,
 		})
 		if err != nil {

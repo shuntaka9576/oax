@@ -86,6 +86,8 @@ oax chat -m "gpt-3.5-turbo" -f "~/.config/oax/chat-log/2023-03-26_15-11-04.toml"
 
 ### Setting
 
+#### setting
+
 |Option|Description|Required|Default|
 |---|---|---|---|
 |editor|Integrated editor|true|`vim`|
@@ -96,6 +98,17 @@ e.g.
 [setting]
   editor = "nvim"
   chatLogDir = "~/.config/oax/chat-log"
+```
+
+#### chat
+
+|Option|Description|Required|Default|
+|---|---|---|---|
+|model|ChatGPT model|false|`gpt-3.5-turbo`|
+
+```toml
+[chat]
+  model = "gpt-3.5-turbo"
 ```
 
 ### Profiles
