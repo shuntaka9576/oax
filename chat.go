@@ -15,9 +15,8 @@ import (
 )
 
 type ChatMessage struct {
-	SequentialNumber int    `toml:"sequentialNumber"`
-	Role             string `toml:"role"`
-	Content          string `toml:"content"`
+	Role    string `toml:"role"`
+	Content string `toml:"content"`
 }
 
 type ChatLogToml struct {
@@ -31,7 +30,6 @@ type ChatLog struct {
 }
 
 func (c *ChatLog) AddChatMessage(chatMessage ChatMessage) *ChatLog {
-	chatMessage.SequentialNumber = len(c.ChatLogToml.Messages)
 	c.ChatLogToml.Messages = append(c.ChatLogToml.Messages, chatMessage)
 
 	return c
@@ -103,13 +101,12 @@ func (c *ChatLog) FlushFile() error {
 
 	for _, message := range c.ChatLogToml.Messages {
 		builder.WriteString(fmt.Sprintf(`[[messages]]
-  sequentialNumber = %d
   role = "%s"
   content = '''
 %s
 '''
 
-`, message.SequentialNumber, message.Role, message.Content))
+`, message.Role, message.Content))
 
 	}
 

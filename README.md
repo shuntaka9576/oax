@@ -55,7 +55,6 @@ oax chat
 Specify sent content to ChatGPT. exit with wq.
 ```toml
 [[messages]]
-  sequentialNumber = 0
   role = "user"
   content = '''
 # Remove this comment and specify content to send to OpenAI API; otherwise, nothing is sent.
