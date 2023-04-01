@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/shuntaka9576/oax"
@@ -31,14 +29,6 @@ var (
 )
 
 func Chat(opt *ChatOption) error {
-	if opt.File == nil {
-		return ChatNew(opt)
-	} else {
-		return ChatWithFile(opt)
-	}
-}
-
-func ChatNew(opt *ChatOption) error {
 	if opt.Role == "" {
 		opt.Role = "user"
 	}
@@ -48,19 +38,37 @@ func ChatNew(opt *ChatOption) error {
 		Content: contentUserDefault,
 	}
 
+	editor := oax.InitEditor(opt.Editor)
+
 	chatLog := oax.ChatLog{
 		ConfigDir:   opt.ChatLogDir,
 		ChatLogToml: oax.ChatLogToml{},
 	}
-	if opt.Template != nil {
-		for _, message := range opt.Template.Messages {
-			chatLog.AddChatMessage(
-				oax.ChatMessage(message),
-			)
+
+	if opt.File == nil {
+		chatLog.InitLogFile()
+		chatLog.FlushFile()
+	} else {
+		if err := chatLog.LoadFile(*opt.File); err != nil {
+			return err
+		}
+		err := chatLog.LoadLogMessage()
+		if err != nil {
+			return err
 		}
 	}
 
-	chatLog.AddChatMessage(userEmptyMessage)
+	if !isLastEmptyMessage(chatLog.ChatLogToml.Messages) {
+		if opt.File == nil && opt.Template != nil {
+			for _, message := range opt.Template.Messages {
+				chatLog.AddChatMessage(
+					oax.ChatMessage(message),
+				)
+			}
+		}
+
+		chatLog.AddChatMessage(userEmptyMessage)
+	}
 
 	err := chatLog.FlushFile()
 	if err != nil {
@@ -71,17 +79,7 @@ func ChatNew(opt *ChatOption) error {
 	errCh := make(chan error)
 	messageCh := make(chan openai.Message)
 
-	openaiClient := openai.InitClient(&openai.InitClientOptions{
-		APIKey: opt.APIKey,
-		ErrCh:  errCh,
-	})
-
-	cmd := exec.Command(opt.Editor, *chatLog.FilePath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Run()
+	err = editor.Open(*chatLog.FilePath)
 	if err != nil {
 		return err
 	}
@@ -96,306 +94,163 @@ func ChatNew(opt *ChatOption) error {
 		return err
 	}
 
-	messages := chatLog.CreateOpenAIMessages()
-
-	if isSkip := isSkipRequest(messages); !isSkip {
-		go func() {
-			openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
-				Model:     opt.Model,
-				Messages:  messages,
-				MessageCh: messageCh,
-				DoneCh:    doneCh,
-				ErrCh:     errCh,
-			})
-		}()
-
-		var bufFromChatGPT bytes.Buffer
-		chatGPTChatMessage := oax.ChatMessage{}
-		multiWriter := io.MultiWriter(&bufFromChatGPT, os.Stdout)
-
-	LOOP:
-		for {
-		INTERACTIVE:
-			select {
-			case content := <-messageCh:
-				if content.Role != "" {
-					chatGPTChatMessage.Role = content.Role
-				}
-				fmt.Fprintf(multiWriter, "%s", content.Content)
-			case err := <-errCh:
-
-				if errors.Is(err, openai.ErrorOpenAIUnauthorized) {
-					fmt.Fprintf(os.Stderr, "%s. Please check if the API key is correct using `oax config --profiles`.\n", err)
-				} else {
-					fmt.Fprintf(os.Stderr, "%s", err)
-				}
-
-				return err
-			case <-doneCh:
-				chatGPTChatMessage.Content = bufFromChatGPT.String()
-				chatLog.
-					AddChatMessage((chatGPTChatMessage))
-
-				err = chatLog.FlushFile()
-				if err != nil {
-					return err
-				}
-
-				reader := bufio.NewReader(os.Stdin)
-				for {
-					fmt.Print("\n\n")
-					fmt.Print("continue (y/n)?: ")
-
-					input, err := reader.ReadString('\n')
-					if err != nil {
-						fmt.Printf("Error reading input: %v\n", err)
-						continue
-					}
-
-					input = strings.ToLower(strings.TrimSpace(input))
-					if input == "y" || input == "Y" {
-						chatLog.
-							AddChatMessage(userEmptyMessage)
-						err = chatLog.FlushFile()
-						if err != nil {
-							return err
-						}
-
-						bufFromChatGPT = bytes.Buffer{}
-						chatGPTChatMessage = oax.ChatMessage{}
-
-						cmd := exec.Command(opt.Editor, *chatLog.FilePath)
-						cmd.Stdin = os.Stdin
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-						err = cmd.Run()
-						if err != nil {
-							log.Fatal(err)
-						}
-
-						err = chatLog.LoadLogMessage()
-						if err != nil {
-							return err
-						}
-
-						messages := chatLog.CreateOpenAIMessages()
-						if isSkip = isSkipRequest(messages); !isSkip {
-							go func() {
-								openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
-									Model:     opt.Model,
-									Messages:  messages,
-									MessageCh: messageCh,
-									DoneCh:    doneCh,
-									ErrCh:     errCh,
-								})
-							}()
-						} else {
-							break LOOP
-						}
-
-						break INTERACTIVE
-					}
-
-					if input == "n" || input == "N" {
-						break LOOP
-					}
-				}
-			}
-		}
-		filePathForUser, err := chatLog.FilePathForUser()
-		if err != nil {
+	if len(chatLog.ChatLogToml.Messages) == 1 && isLastEmptyMessage(chatLog.ChatLogToml.Messages) {
+		if err := deleteFile(chatLog); err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stdout, "saved: %s\n", filePathForUser)
 
 		return nil
-	} else {
-		filePathForUser, err := chatLog.FilePathForUser()
-		if err != nil {
-			return err
-		}
-		err = chatLog.DeleteFile()
-		if err != nil {
-			return err
-		}
-
-		fmt.Fprintf(os.Stdout, "skip delete file: %s\n", filePathForUser)
+	} else if isLastEmptyMessage(chatLog.ChatLogToml.Messages) {
+		fmt.Fprintf(os.Stderr, "detected default comment, terminating process.")
 
 		return nil
 	}
-}
-
-func isSkipRequest(messages []openai.Message) bool {
-	lastmsg := messages[len(messages)-1]
-
-	return lastmsg.Content == contentUserDefault
-}
-
-func ChatWithFile(opt *ChatOption) error {
-	if opt.Role == "" {
-		opt.Role = "user"
-	}
-
-	userEmptyMessage := oax.ChatMessage{
-		Role:    opt.Role,
-		Content: contentUserDefault,
-	}
-
-	chatLog := oax.ChatLog{
-		ConfigDir: opt.ChatLogDir,
-	}
-
-	err := chatLog.LoadFile(*opt.File)
-	if err != nil {
-		return err
-	}
-
-	err = chatLog.LoadLogMessage()
-	if err != nil {
-		return err
-	}
-
-	isSkip := isSkipRequest(chatLog.CreateOpenAIMessages())
-
-	if !isSkip {
-		chatLog.AddChatMessage(userEmptyMessage)
-		err := chatLog.FlushFile()
-		if err != nil {
-			return err
-		}
-	}
-
-	cmd := exec.Command(opt.Editor, *chatLog.FilePath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	err = chatLog.LoadLogMessage()
-	if err != nil {
-		return err
-	}
-
-	messages := chatLog.CreateOpenAIMessages()
-
-	doneCh := make(chan struct{})
-	errCh := make(chan error)
-	messageCh := make(chan openai.Message)
 
 	openaiClient := openai.InitClient(&openai.InitClientOptions{
 		APIKey: opt.APIKey,
 		ErrCh:  errCh,
 	})
 
-	if isSkip := isSkipRequest(messages); !isSkip {
-		go func() {
-			openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
-				Model:     opt.Model,
-				Messages:  messages,
-				MessageCh: messageCh,
-				DoneCh:    doneCh,
-				ErrCh:     errCh,
-			})
-		}()
+	go func() {
+		openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
+			Model:     opt.Model,
+			Messages:  chatLog.CreateOpenAIMessages(),
+			MessageCh: messageCh,
+			DoneCh:    doneCh,
+			ErrCh:     errCh,
+		})
+	}()
 
-		var bufFromChatGPT bytes.Buffer
-		chatGPTChatMessage := oax.ChatMessage{}
-		multiWriter := io.MultiWriter(&bufFromChatGPT, os.Stdout)
+	var bufFromChatGPT bytes.Buffer
+	chatGPTChatMessage := oax.ChatMessage{}
+	multiWriter := io.MultiWriter(&bufFromChatGPT, os.Stdout)
 
-	LOOP:
-		for {
-		INTERACTIVE:
-			select {
-			case content := <-messageCh:
-				if content.Role != "" {
-					chatGPTChatMessage.Role = content.Role
-				}
-				fmt.Fprintf(multiWriter, "%s", content.Content)
-			case err := <-errCh:
+LOOP:
+	for {
+	INTERACTIVE:
+		select {
+		case content := <-messageCh:
+			if content.Role != "" {
+				chatGPTChatMessage.Role = content.Role
+			}
+			fmt.Fprintf(multiWriter, "%s", content.Content)
+		case err := <-errCh:
+
+			if errors.Is(err, openai.ErrorOpenAIUnauthorized) {
+				fmt.Fprintf(os.Stderr, "%s. Please check if the API key is correct using `oax config --profiles`.\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "%s", err)
+			}
+
+			return err
+		case <-doneCh:
+			chatGPTChatMessage.Content = bufFromChatGPT.String()
+			chatLog.
+				AddChatMessage((chatGPTChatMessage))
+
+			err = chatLog.FlushFile()
+			if err != nil {
 				return err
-			case <-doneCh:
-				chatGPTChatMessage.Content = bufFromChatGPT.String()
-				chatLog.
-					AddChatMessage((chatGPTChatMessage))
+			}
 
-				err = chatLog.FlushFile()
+			reader := bufio.NewReader(os.Stdin)
+			for {
+				fmt.Print("\n\n")
+				fmt.Print("continue (y/n)?: ")
+
+				input, err := reader.ReadString('\n')
 				if err != nil {
-					return err
+					fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
+					continue
 				}
 
-				reader := bufio.NewReader(os.Stdin)
-				for {
-					fmt.Print("\n\n")
-					fmt.Print("continue (y/n)?: ")
-
-					input, err := reader.ReadString('\n')
+				input = strings.ToLower(strings.TrimSpace(input))
+				if input == "y" || input == "Y" {
+					chatLog.
+						AddChatMessage(userEmptyMessage)
+					err = chatLog.FlushFile()
 					if err != nil {
-						fmt.Printf("Error reading input: %v\n", err)
-						continue
+						return err
 					}
 
-					input = strings.ToLower(strings.TrimSpace(input))
-					if input == "y" || input == "Y" {
-						chatLog.
-							AddChatMessage(userEmptyMessage)
-						err = chatLog.FlushFile()
-						if err != nil {
-							return err
-						}
+					bufFromChatGPT = bytes.Buffer{}
+					chatGPTChatMessage = oax.ChatMessage{}
 
-						bufFromChatGPT = bytes.Buffer{}
-						chatGPTChatMessage = oax.ChatMessage{}
-
-						cmd := exec.Command(opt.Editor, *chatLog.FilePath)
-						cmd.Stdin = os.Stdin
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-						err = cmd.Run()
-						if err != nil {
-							log.Fatal(err)
-						}
-
-						err = chatLog.LoadLogMessage()
-						if err != nil {
-							return err
-						}
-
-						messages := chatLog.CreateOpenAIMessages()
-						if isSkip = isSkipRequest(messages); !isSkip {
-							go func() {
-								openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
-									Model:     opt.Model,
-									Messages:  messages,
-									MessageCh: messageCh,
-									DoneCh:    doneCh,
-									ErrCh:     errCh,
-								})
-							}()
-						} else {
-							break LOOP
-						}
-
-						break INTERACTIVE
+					err = editor.Open(*chatLog.FilePath)
+					if err != nil {
+						return err
 					}
 
-					if input == "n" || input == "N" {
+					err = chatLog.LoadLogMessage()
+					if err != nil {
+						return err
+					}
+
+					if isSkip := isLastEmptyMessage(chatLog.ChatLogToml.Messages); !isSkip {
+						go func() {
+							openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
+								Model:     opt.Model,
+								Messages:  chatLog.CreateOpenAIMessages(),
+								MessageCh: messageCh,
+								DoneCh:    doneCh,
+								ErrCh:     errCh,
+							})
+						}()
+					} else {
 						break LOOP
 					}
+
+					break INTERACTIVE
+				}
+
+				if input == "n" || input == "N" {
+					break LOOP
 				}
 			}
 		}
+	}
+
+	if len(chatLog.ChatLogToml.Messages) == 1 && isLastEmptyMessage(chatLog.ChatLogToml.Messages) {
+		if err := deleteFile(chatLog); err != nil {
+			return err
+		}
+	} else {
 		filePathForUser, err := chatLog.FilePathForUser()
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stdout, "updated: %s\n", filePathForUser)
 
-		return nil
+		if opt.File == nil {
+			fmt.Fprintf(os.Stderr, "saved: %s\n", filePathForUser)
+		} else {
+			fmt.Fprintf(os.Stderr, "updated: %s\n", filePathForUser)
+		}
 	}
 
 	return nil
+}
+
+func deleteFile(chatLog oax.ChatLog) error {
+	filePathForUser, err := chatLog.FilePathForUser()
+	if err != nil {
+		return err
+	}
+
+	err = chatLog.DeleteFile()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "skip delete file: %s\n", filePathForUser)
+
+	return nil
+}
+
+func isLastEmptyMessage(messages []oax.ChatMessage) bool {
+	if len(messages) > 0 {
+		lastmsg := messages[len(messages)-1]
+
+		return lastmsg.Content == contentUserDefault
+	}
+
+	return false
 }

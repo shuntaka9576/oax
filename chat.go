@@ -86,12 +86,6 @@ func (c *ChatLog) CreateOpenAIMessages() (messages []openai.Message) {
 }
 
 func (c *ChatLog) FlushFile() error {
-	if c.FilePath == nil {
-		filename := time.Now().Format("2006-01-02_15-04-05") + ".toml"
-		filePath := filepath.Join(c.ConfigDir, filename)
-		c.FilePath = &filePath
-	}
-
 	var builder strings.Builder
 
 	for _, message := range c.ChatLogToml.Messages {
@@ -102,14 +96,20 @@ func (c *ChatLog) FlushFile() error {
 '''
 
 `, message.Role, message.Content))
-
 	}
 
 	err := ioutil.WriteFile(*c.FilePath, []byte(builder.String()), 0644)
 	if err != nil {
 		return err
 	}
+
 	return nil
+}
+
+func (c *ChatLog) InitLogFile() {
+	filename := time.Now().Format("2006-01-02_15-04-05") + ".toml"
+	filePath := filepath.Join(c.ConfigDir, filename)
+	c.FilePath = &filePath
 }
 
 func (c *ChatLog) LoadFile(filePath string) error {
