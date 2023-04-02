@@ -64,6 +64,13 @@ func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return resp, err
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.StatusCode == 401 {
+			return nil, fmt.Errorf("OpenAI API Request error status code %d: %w", resp.StatusCode, ErrorOpenAIUnauthorized)
+		} else {
+			return nil, fmt.Errorf("OpenAI API Request error status code %d", resp.StatusCode)
+		}
+	} else {
+		return resp, err
+	}
 }

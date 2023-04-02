@@ -33,7 +33,7 @@ func (c *HTTPClient) sseRequest(ctx context.Context, url string, method string, 
 	return c.Client.Do(req)
 }
 
-func (c *HTTPClient) SubscribeWithContext(ctx context.Context, url string, method string, request io.Reader, handler func(msg *Event, err error)) error {
+func (c *HTTPClient) SubscribeWithContext(ctx context.Context, url string, method string, request io.Reader, handler func(msg *Event, err error) error) error {
 	res, err := c.sseRequest(ctx, url, method, request)
 	if err != nil {
 		handler(nil, err)
@@ -77,11 +77,17 @@ func (c *HTTPClient) SubscribeWithContext(ctx context.Context, url string, metho
 	for {
 		select {
 		case err = <-errCh:
-			handler(nil, err)
-
-			return err
+			err := handler(nil, err)
+			if err != nil {
+				return err
+			} else {
+				return nil
+			}
 		case msg := <-eventCh:
-			handler(msg, nil)
+			err := handler(msg, nil)
+			if err != nil {
+				return err
+			}
 		case <-ctx.Done():
 			return nil
 		}

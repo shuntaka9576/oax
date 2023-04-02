@@ -39,13 +39,7 @@ type ChatCreateCompletionOption struct {
 	Messages []Message
 }
 
-type CreateCompletionStream struct {
-}
-
-type CreateCompletionStreamEvent struct {
-}
-
-func (c *Client) ChatCreateCompletionSubscribeWithContext(ctx context.Context, opt *ChatCreateCompletionOption, handler func(msg *ChatCompletionResponse, err error)) error {
+func (c *Client) ChatCreateCompletionSubscribeWithContext(ctx context.Context, opt *ChatCreateCompletionOption, handler func(msg *ChatCompletionResponse, err error) error) error {
 	body := requestBody{
 		Messages: opt.Messages,
 		Model:    opt.Model,
@@ -57,29 +51,45 @@ func (c *Client) ChatCreateCompletionSubscribeWithContext(ctx context.Context, o
 		return err
 	}
 
-	c.client.SubscribeWithContext(ctx, APIBaseEndpoint+"/v1/chat/completions", "POST", bytes.NewBuffer(reqBytes), func(msg *sse.Event, err error) {
+	err = c.client.SubscribeWithContext(ctx, APIBaseEndpoint+"/v1/chat/completions", "POST", bytes.NewBuffer(reqBytes), func(msg *sse.Event, err error) error {
 		if err != nil {
-
-			handler(nil, err)
-			return
+			err := handler(nil, err)
+			if err != nil {
+				return err
+			}
 		}
 
 		if msg != nil {
 			if string(msg.Data) == "[DONE]" {
-				handler(nil, io.EOF)
+				err := handler(nil, io.EOF)
+				if err != nil {
+					return err
+				}
 
-				return
+				return nil
 			} else {
 				var jsonData ChatCompletionResponse
 				err = json.Unmarshal([]byte(msg.Data), &jsonData)
 				if err != nil {
-					handler(nil, err)
+					err := handler(nil, err)
+					if err != nil {
+						return err
+					}
 				}
 
-				handler(&jsonData, err)
+				err := handler(&jsonData, err)
+				if err != nil {
+					return err
+				}
 			}
 		}
+
+		return nil
 	})
+
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

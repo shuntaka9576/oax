@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -113,10 +114,17 @@ func Chat(opt *ChatOption) error {
 
 	ctx := context.Background()
 
-	subScribeChat := func(event *openai.ChatCompletionResponse, err error) {
+	subScribeChat := func(event *openai.ChatCompletionResponse, err error) error {
 		if err != nil {
 			if err == io.EOF {
-				return
+				return nil
+			} else {
+				if errors.Is(err, openai.ErrorOpenAIUnauthorized) {
+					fmt.Fprintf(os.Stderr, "%s. Please check if the API key is correct using `oax config --profiles`.\n", err)
+				}
+				fmt.Fprintf(os.Stderr, "%s`.\n", err)
+
+				return err
 			}
 
 		} else {
@@ -126,6 +134,8 @@ func Chat(opt *ChatOption) error {
 			if event.Choices[0].Delta.Content != "" {
 				fmt.Fprintf(multiWriter, "%v", event.Choices[0].Delta.Content)
 			}
+
+			return nil
 		}
 	}
 
@@ -134,10 +144,14 @@ LOOP:
 	INTERACTIVE:
 		for {
 			if isSkip := isLastEmptyMessage(chatLog.ChatLogToml.Messages); !isSkip {
-				openaiClient.ChatCreateCompletionSubscribeWithContext(ctx, &openai.ChatCreateCompletionOption{
+				err := openaiClient.ChatCreateCompletionSubscribeWithContext(ctx, &openai.ChatCreateCompletionOption{
 					Messages: chatLog.CreateOpenAIMessages(),
 					Model:    opt.Model,
 				}, subScribeChat)
+
+				if err != nil {
+					return err
+				}
 
 				chatGPTChatMessage.Content = bufFromChatGPT.String()
 				chatLog.AddChatMessage(chatGPTChatMessage)
