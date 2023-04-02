@@ -3,7 +3,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
-	"errors"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -75,10 +75,6 @@ func Chat(opt *ChatOption) error {
 		return err
 	}
 
-	doneCh := make(chan struct{})
-	errCh := make(chan error)
-	messageCh := make(chan openai.Message)
-
 	err = editor.Open(*chatLog.FilePath)
 	if err != nil {
 		return err
@@ -107,105 +103,85 @@ func Chat(opt *ChatOption) error {
 	}
 
 	openaiClient := openai.InitClient(&openai.InitClientOptions{
-		APIKey: opt.APIKey,
-		ErrCh:  errCh,
+		APIKey:         opt.APIKey,
+		OrganizationID: opt.OrganizationID,
 	})
 
-	go func() {
-		openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
-			Model:     opt.Model,
-			Messages:  chatLog.CreateOpenAIMessages(),
-			MessageCh: messageCh,
-			DoneCh:    doneCh,
-			ErrCh:     errCh,
-		})
-	}()
-
-	var bufFromChatGPT bytes.Buffer
+	bufFromChatGPT := bytes.Buffer{}
 	chatGPTChatMessage := oax.ChatMessage{}
 	multiWriter := io.MultiWriter(&bufFromChatGPT, os.Stdout)
+
+	ctx := context.Background()
+
+	subScribeChat := func(event *openai.ChatCompletionResponse, err error) {
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+
+		} else {
+			if event.Choices[0].Delta.Role != "" {
+				chatGPTChatMessage.Role = event.Choices[0].Delta.Role
+			}
+			if event.Choices[0].Delta.Content != "" {
+				fmt.Fprintf(multiWriter, "%v", event.Choices[0].Delta.Content)
+			}
+		}
+	}
 
 LOOP:
 	for {
 	INTERACTIVE:
-		select {
-		case content := <-messageCh:
-			if content.Role != "" {
-				chatGPTChatMessage.Role = content.Role
-			}
-			fmt.Fprintf(multiWriter, "%s", content.Content)
-		case err := <-errCh:
+		for {
+			if isSkip := isLastEmptyMessage(chatLog.ChatLogToml.Messages); !isSkip {
+				openaiClient.ChatCreateCompletionSubscribeWithContext(ctx, &openai.ChatCreateCompletionOption{
+					Messages: chatLog.CreateOpenAIMessages(),
+					Model:    opt.Model,
+				}, subScribeChat)
 
-			if errors.Is(err, openai.ErrorOpenAIUnauthorized) {
-				fmt.Fprintf(os.Stderr, "%s. Please check if the API key is correct using `oax config --profiles`.\n", err)
+				chatGPTChatMessage.Content = bufFromChatGPT.String()
+				chatLog.AddChatMessage(chatGPTChatMessage)
+				chatLog.FlushFile()
 			} else {
-				fmt.Fprintf(os.Stderr, "%s", err)
-			}
-
-			return err
-		case <-doneCh:
-			chatGPTChatMessage.Content = bufFromChatGPT.String()
-			chatLog.
-				AddChatMessage((chatGPTChatMessage))
-
-			err = chatLog.FlushFile()
-			if err != nil {
-				return err
+				break LOOP
 			}
 
 			reader := bufio.NewReader(os.Stdin)
-			for {
-				fmt.Print("\n\n")
-				fmt.Print("continue (y/n)?: ")
+			fmt.Print("\n\n")
+			fmt.Print("continue (y/n)?: ")
 
-				input, err := reader.ReadString('\n')
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
+				continue
+			}
+
+			input = strings.ToLower(strings.TrimSpace(input))
+			if input == "y" || input == "Y" {
+				chatLog.
+					AddChatMessage(userEmptyMessage)
+
+				err = chatLog.FlushFile()
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
-					continue
+					return err
+				}
+				bufFromChatGPT = bytes.Buffer{}
+
+				err = editor.Open(*chatLog.FilePath)
+				if err != nil {
+					return err
 				}
 
-				input = strings.ToLower(strings.TrimSpace(input))
-				if input == "y" || input == "Y" {
-					chatLog.
-						AddChatMessage(userEmptyMessage)
-					err = chatLog.FlushFile()
-					if err != nil {
-						return err
-					}
-
-					bufFromChatGPT = bytes.Buffer{}
-					chatGPTChatMessage = oax.ChatMessage{}
-
-					err = editor.Open(*chatLog.FilePath)
-					if err != nil {
-						return err
-					}
-
-					err = chatLog.LoadLogMessage()
-					if err != nil {
-						return err
-					}
-
-					if isSkip := isLastEmptyMessage(chatLog.ChatLogToml.Messages); !isSkip {
-						go func() {
-							openaiClient.ChatCreateCompletion(&openai.ChatCreateCompletionOption{
-								Model:     opt.Model,
-								Messages:  chatLog.CreateOpenAIMessages(),
-								MessageCh: messageCh,
-								DoneCh:    doneCh,
-								ErrCh:     errCh,
-							})
-						}()
-					} else {
-						break LOOP
-					}
-
-					break INTERACTIVE
+				err = chatLog.LoadLogMessage()
+				if err != nil {
+					return err
 				}
 
-				if input == "n" || input == "N" {
-					break LOOP
-				}
+				break INTERACTIVE
+			}
+
+			if input == "n" || input == "N" {
+				break LOOP
 			}
 		}
 	}
