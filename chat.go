@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/itchyny/timefmt-go"
 	"github.com/pelletier/go-toml"
 	"github.com/shuntaka9576/oax/openai"
 )
@@ -106,8 +107,24 @@ func (c *ChatLog) FlushFile() error {
 	return nil
 }
 
-func (c *ChatLog) InitLogFile() {
-	filename := time.Now().Format("2006-01-02_15-04-05") + ".toml"
+func (c *ChatLog) InitLogFile(title string, fileNameFormat string) {
+	var useFormat string
+
+	if fileNameFormat == "" {
+		if title == "" {
+			useFormat = "%Y-%m-%d_%H-%M-%S"
+		} else {
+			useFormat = "%Y-%m-%d_%H-%M-%S_${title}"
+		}
+	} else {
+		useFormat = fileNameFormat
+	}
+
+	useFormat = strings.ReplaceAll(useFormat, "${title}", title)
+
+	t := time.Now()
+	filename := timefmt.Format(t, useFormat) + ".toml"
+
 	filePath := filepath.Join(c.ConfigDir, filename)
 	c.FilePath = &filePath
 }

@@ -103,11 +103,13 @@ e.g.
 |Option|Description|Required|Default|
 |---|---|---|---|
 |model|ChatGPT model|false|`gpt-3.5-turbo`|
+|fileNameFormat|Providing `${title}` placeholder|false|`%Y-%m-%d_%H-%M-%S`
 |chat.templates|Chat template|false||
 
 ```toml
 [chat]
   model = "gpt-3.5-turbo"
+  fileNameFormat = "%Y-%m-%d_%H-%M-%S"
 
   [[chat.templates]]
     name = "friends"

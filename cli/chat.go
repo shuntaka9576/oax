@@ -21,6 +21,7 @@ type ChatOption struct {
 	Model          string
 	Role           string
 	ChatLogDir     string
+	FileNameFormat string
 	File           *string
 	Template       *oax.ChatTemplate
 }
@@ -34,12 +35,18 @@ func Chat(opt *ChatOption) error {
 		opt.Role = "user"
 	}
 
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Title: ")
+	title, err := reader.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	title = title[:len(title)-1]
+
 	userEmptyMessage := oax.ChatMessage{
 		Role:    opt.Role,
 		Content: contentUserDefault,
 	}
-
-	editor := oax.InitEditor(opt.Editor)
 
 	chatLog := oax.ChatLog{
 		ConfigDir:   opt.ChatLogDir,
@@ -47,7 +54,7 @@ func Chat(opt *ChatOption) error {
 	}
 
 	if opt.File == nil {
-		chatLog.InitLogFile()
+		chatLog.InitLogFile(title, opt.FileNameFormat)
 		chatLog.FlushFile()
 	} else {
 		if err := chatLog.LoadFile(*opt.File); err != nil {
@@ -71,10 +78,12 @@ func Chat(opt *ChatOption) error {
 		chatLog.AddChatMessage(userEmptyMessage)
 	}
 
-	err := chatLog.FlushFile()
+	err = chatLog.FlushFile()
 	if err != nil {
 		return err
 	}
+
+	editor := oax.InitEditor(opt.Editor)
 
 	err = editor.Open(*chatLog.FilePath)
 	if err != nil {

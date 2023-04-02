@@ -23,8 +23,9 @@ type Setting struct {
 }
 
 type Chat struct {
-	Model     string         `toml:"model"`
-	Templates []ChatTemplate `toml:"templates"`
+	Model          string         `toml:"model"`
+	Templates      []ChatTemplate `toml:"templates"`
+	FileNameFormat string         `toml:"fileNameFormat"`
 }
 
 type ChatTemplate struct {

@@ -94,6 +94,7 @@ func main() {
 			Editor:         config.Settings.Setting.Editor,
 			Model:          model,
 			ChatLogDir:     config.Settings.Setting.ChatLogDir,
+			FileNameFormat: config.Settings.Chat.FileNameFormat,
 			File:           CLI.Chat.File,
 			Template:       useTemplate,
 		})
