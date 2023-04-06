@@ -35,14 +35,6 @@ func Chat(opt *ChatOption) error {
 		opt.Role = "user"
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Title: ")
-	title, err := reader.ReadString('\n')
-	if err != nil {
-		return err
-	}
-	title = title[:len(title)-1]
-
 	userEmptyMessage := oax.ChatMessage{
 		Role:    opt.Role,
 		Content: contentUserDefault,
@@ -54,6 +46,15 @@ func Chat(opt *ChatOption) error {
 	}
 
 	if opt.File == nil {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Title: ")
+
+		title, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+
+		title = title[:len(title)-1]
 		chatLog.InitLogFile(title, opt.FileNameFormat)
 		chatLog.FlushFile()
 	} else {
@@ -78,7 +79,7 @@ func Chat(opt *ChatOption) error {
 		chatLog.AddChatMessage(userEmptyMessage)
 	}
 
-	err = chatLog.FlushFile()
+	err := chatLog.FlushFile()
 	if err != nil {
 		return err
 	}
