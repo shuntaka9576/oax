@@ -24,6 +24,7 @@ var CLI struct {
 		Model        string  `short:"m" help:"Specify the ID of the model to use gpt-4, gpt-4-0314, gpt-4-32k, gpt-4-32k-0314, gpt-3.5-turbo, gpt-3.5-turbo-0301(default gpt-3.5-turbo)"`
 		File         *string `short:"f" help:"Specify the chat history file with the full path."`
 		TemplateName string  `short:"t" help:"Specify a chat template name."`
+		Continue     bool    `short:"c" help:"Search your past chat history files with fuzzy matching and resume the chat from where you left off. This is an easier way to resume than using the --file option."`
 	} `cmd:"" help:"Provides a dialogue function like chat.openai.com."`
 }
 
@@ -97,6 +98,7 @@ func main() {
 			FileNameFormat: config.Settings.Chat.FileNameFormat,
 			File:           CLI.Chat.File,
 			Template:       useTemplate,
+			Continue:       CLI.Chat.Continue,
 		})
 		if err != nil {
 			os.Exit(1)

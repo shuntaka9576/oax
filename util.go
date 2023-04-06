@@ -1,8 +1,11 @@
 package oax
 
 import (
+	"io/fs"
 	"os"
 	"os/user"
+	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -38,4 +41,37 @@ func replaceHomedirWithTilde(path string) (string, error) {
 	}
 
 	return path, nil
+}
+
+type FileInfo struct {
+	FileFullPath string
+	FileName     string
+}
+
+func ListFiles(dir string) (fileInfos []FileInfo, err error) {
+	err = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() {
+			fileInfo := FileInfo{
+				FileName:     filepath.Base(path),
+				FileFullPath: path,
+			}
+			fileInfos = append(fileInfos, fileInfo)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return
+	}
+
+	sort.Slice(fileInfos, func(i, j int) bool {
+		return fileInfos[i].FileName > fileInfos[j].FileName
+	})
+
+	return
 }

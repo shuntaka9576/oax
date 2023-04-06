@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	fuzzyfinder "github.com/ktr0731/go-fuzzyfinder"
 	"github.com/shuntaka9576/oax"
 	"github.com/shuntaka9576/oax/openai"
 )
@@ -23,6 +24,7 @@ type ChatOption struct {
 	ChatLogDir     string
 	FileNameFormat string
 	File           *string
+	Continue       bool
 	Template       *oax.ChatTemplate
 }
 
@@ -31,6 +33,22 @@ var (
 )
 
 func Chat(opt *ChatOption) error {
+	if opt.Continue {
+		files, err := oax.ListFiles(opt.ChatLogDir)
+		if err != nil {
+			return nil
+		}
+
+		index, err := fuzzyfinder.Find(files, func(i int) string {
+			return files[i].FileName
+		})
+		if err != nil {
+			return err
+		}
+
+		opt.File = &files[index].FileFullPath
+	}
+
 	if opt.Role == "" {
 		opt.Role = "user"
 	}
