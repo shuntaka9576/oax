@@ -69,6 +69,12 @@ continue (y/n)?: n
 saved: ~/.config/oax/chat-log/2023-03-26_17-01-54.toml
 ```
 
+When resuming, you can perform fuzzy search on chat history files by their titles.
+
+```bash
+oax chat -c
+```
+
 Files can be resumed from the middle of the process by specifying the full path of the file.
 ```bash
 oax chat -m "gpt-3.5-turbo" -f "~/.config/oax/chat-log/2023-03-26_15-11-04.toml"
